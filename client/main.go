@@ -16,9 +16,8 @@ type User struct {
 	Age  int    `json:"age"`
 }
 
-// change port to make it dynamic 
-func main() {
-	base_url := "http://localhost:8080/users"
+func userSide(port string) {
+	base_url := "http://localhost:" + port +"/users"
 	fmt.Println("User Client, type help for options or exit to quit")
 	scanner := bufio.NewScanner(os.Stdin)
 
@@ -215,5 +214,53 @@ func main() {
 			fmt.Println("Type 'help' for a list of available commands. ")
 			continue
 		}
+	}
+}
+
+func appSide() {
+
+}
+
+// change port to make it dynamic 
+func main() {
+	var port, endpoint string
+
+	fmt.Println("Hello Client, which port do you want?")
+	for{
+		scanner := bufio.NewScanner(os.Stdin)
+		if !scanner.Scan(){
+			fmt.Print("STOPPED")
+				return
+		}
+		port = scanner.Text()
+		var port_int int
+		fmt.Sscanf(port, "%d", &port_int)
+		if port_int>=1000 && port_int<=9999{
+			break
+		}
+		fmt.Println("Nonexistent port, format is xxxx. Try again.")
+		continue
+	}
+
+	fmt.Println("Which endpoint do you want to vist: type 'users' or 'apps'")
+	for{
+		scanner := bufio.NewScanner(os.Stdin)
+		if !scanner.Scan(){
+			fmt.Print("STOPPED")
+				return
+		}
+		endpoint = scanner.Text()
+
+		if endpoint== "users" || endpoint == "apps"{
+			break
+		}
+		fmt.Println("Nonexistent endpoint, try again.")
+			continue
+	}
+
+	if endpoint=="users"{
+		userSide(port)
+	}else{
+		appSide()
 	}
 }

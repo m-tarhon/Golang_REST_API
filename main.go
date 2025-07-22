@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 )
@@ -121,16 +123,38 @@ func userManagement(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func appsManagement(w http.ResponseWriter, r *http.Request) {
+
+}
+
 func main() {
-	// allow to select port 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/healthcheck", healthcheck)
-	mux.HandleFunc("/users", userManagement)
-	mux.HandleFunc("/users/", userManagement)
 
-	err := http.ListenAndServe(":8080", mux)
-	if err != nil {
-		fmt.Println(err)
+	fmt.Println("Hello Server, what port would you like to connect to?")
+
+	for{
+
+		//an improvement could be switching to scanner but its minimal 
+		reader := bufio.NewReader(os.Stdin)
+		line, err0 := reader.ReadString('\n')
+		if err0 != nil {
+			fmt.Print("STOPPED")
+			return
+		}
+
+		line = strings.TrimSpace(line)
+		line = ":" + line
+		//fmt.Println(line)
+		
+		mux := http.NewServeMux()
+		mux.HandleFunc("/healthcheck", healthcheck)
+		mux.HandleFunc("/users", userManagement)
+		mux.HandleFunc("/apps", appsManagement)
+
+		err := http.ListenAndServe(line, mux)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Println("That port doesnt exist, the format is xxxx, where x is from [0,9]. Try again!")
+			continue
+		}
 	}
-
 }

@@ -15,11 +15,19 @@ type User struct {
 	Age  int	`json:"age"`
 }
 
+type App struct{
+	Name 	string	 `json:"name"`
+	Born 	int 	 `json:"born"`
+	Price 	float32  `json:"price"`
+}
+
 var Users = []User{
 	{Name: "alice", Age: 42},
 	{Name: "mara", Age: 28},
 	{Name: "bob", Age: 26},
 }
+
+var Apps = []App{{Name: "Bible", Born: 1600, Price: 0.0}}
 
 func healthcheck(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -48,7 +56,9 @@ func userManagement(w http.ResponseWriter, r *http.Request) {
 
 			name := segments[0]
 			var matches []User
+			fmt.Printf("Searching for user: '%s'\n", name)
 			for _, p := range Users{
+				fmt.Printf("Comparing with: '%s'\n", p.Name)
 				if p.Name == name {
 					matches = append(matches, p)
 				}
@@ -89,7 +99,7 @@ func userManagement(w http.ResponseWriter, r *http.Request) {
 			Users = append(Users, p)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			w.Write([]byte(`{"message": "Server-side User created succesfully"!}`))
+			w.Write([]byte(`{"message": "Server-side User created succesfully!"}`))
 			json.NewEncoder(w).Encode(Users) // or: Encode(Users) to return all users
 			return
 		
@@ -109,7 +119,7 @@ func userManagement(w http.ResponseWriter, r *http.Request) {
 					Users = slices.Delete(Users, i, i+1)
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(`{"message": "Server-side User deleted succesfully"!}`))
+					w.Write([]byte(`{"message": "Server-side User deleted succesfully!"}`))
 					json.NewEncoder(w).Encode(Users)
 					return
 				}
@@ -124,9 +134,104 @@ func userManagement(w http.ResponseWriter, r *http.Request) {
 }
 
 func appsManagement(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("appsManagement called with path:", r.URL.Path)
+
+	path := strings.TrimPrefix(r.URL.Path, "/apps")
+	path = strings.Trim(path, "/")
+
+	segments := strings.Split(path, "/")
+
+	switch r.Method {
+		case http.MethodGet:
+			fmt.Println("appsManagement called with path:", r.URL.Path)
+			if path == ""{
+				json.NewEncoder(w).Encode(Apps)
+				return
+			}
+			if len(segments) > 1 {
+				http.Error(w, "Server-side Bad request: additional fields", http.StatusBadRequest)
+				return
+			}
+
+			name := segments[0]
+			var matches []App
+			for _, app := range Apps{
+				if app.Name == name {
+					matches = append(matches, app)
+				}
+			}
+
+			if len(matches) == 0 {
+				http.Error(w, "Server-side: No such apps", http.StatusNotFound)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(matches)
+				
+
+		case http.MethodPost:
+			var app App
+
+			decoder := json.NewDecoder(r.Body)
+			decoder.DisallowUnknownFields()
+			err := decoder.Decode(&app)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			if app.Name == "" || app.Born == 0 || app.Price == 0 {
+				http.Error(w, "Server-side invalid payload: missing required fields", http.StatusBadRequest)
+				return
+			}
+
+			for _, element := range Apps{
+				if element.Name == app.Name && element.Born == app.Born && element.Price == app.Price{
+					http.Error(w, "Server-side: that application already exists.", http.StatusConflict)
+					return
+				}
+			}
+
+			Apps = append(Apps, app)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte(`{"message": "Server-side App created succesfully!"}`))
+			json.NewEncoder(w).Encode(Apps) 
+			return
+		
+		case http.MethodDelete:
+			var app App
+
+			decoder := json.NewDecoder(r.Body)
+			decoder.DisallowUnknownFields()
+			err := decoder.Decode(&app)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			for i, element := range Apps{
+				if element.Name == app.Name && element.Born == app.Born && element.Price == app.Price{
+					Apps = slices.Delete(Apps, i, i+1)
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					w.Write([]byte(`{"message": "Server-side App deleted succesfully!"}`))
+					json.NewEncoder(w).Encode(Apps)
+					return
+				}
+			}
+
+			http.Error(w, "Server-side: App doesn't exist", http.StatusNotFound)
+			return
+
+		default:
+			http.Error(w, "Server-side method not allowed", http.StatusMethodNotAllowed)
+	}
 
 }
 
+// maybe be able to parse sys args to specify a port, or check the sys for an available port
 func main() {
 
 	fmt.Println("Hello Server, what port would you like to connect to?")
@@ -148,8 +253,12 @@ func main() {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/healthcheck", healthcheck)
 		mux.HandleFunc("/users", userManagement)
+		mux.HandleFunc("/users/", userManagement)
 		mux.HandleFunc("/apps", appsManagement)
+		mux.HandleFunc("/apps/", appsManagement)
 
+		// check to see if port is empty or not , to add 
+		// also add a way to see on which port the server is starting 
 		err := http.ListenAndServe(line, mux)
 		if err != nil {
 			fmt.Println(err)

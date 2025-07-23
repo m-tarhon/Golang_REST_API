@@ -16,6 +16,12 @@ type User struct {
 	Age  int    `json:"age"`
 }
 
+type App struct{
+	Name 	string	 `json:"name"`
+	Born 	int 	 `json:"born"`
+	Price 	float32  `json:"price"`
+}
+
 func userSide(port string) {
 	base_url := "http://localhost:" + port +"/users"
 	fmt.Println("User Client, type help for options or exit to quit")
@@ -217,11 +223,214 @@ func userSide(port string) {
 	}
 }
 
-func appSide() {
+func appSide(port string) {
+	base_url := "http://localhost:" + port +"/apps"
 
+	fmt.Println("App Client, type help for options or exit to quit")
+	scanner := bufio.NewScanner(os.Stdin)
+
+	for {
+
+		fmt.Print("§§§ ")
+		if !scanner.Scan() {
+			break
+		}
+
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		if line == "exit" || line == "quit" {
+			fmt.Print("Goodbye!")
+			return
+		}
+
+		args := strings.Fields(line)
+		if len(args) < 1 {
+			continue
+		}
+
+		cmd := args[0]
+		switch cmd {
+		case "help":
+			fmt.Println("Commands: ")
+			fmt.Println(" 1. add <name> <year> <price> --> adds an app")
+			fmt.Println(" 2. get <an app> --> gets information on a specific app")
+			fmt.Println(" 3. list --> which returns all apps")
+			fmt.Println(" 4. delete <name> <DoB> <price> --> delets an app's info")
+			fmt.Println(" 5. exit")
+
+		case "add":
+			if len(args) != 4 {
+				fmt.Println("You need the name, year of creation, and price of the app!")
+				continue
+			}
+			name := args[1]
+			var dob int
+			var price float32
+			fmt.Sscanf(args[2], "%d", &dob)
+			fmt.Sscanf(args[3], "%f", &price)
+
+			a := App{Name: name, Born: dob, Price: price} // check for type 
+			body, err := json.Marshal(a)
+			if err != nil {
+				fmt.Println("Failed to format the app's info into JSON: ", err)
+				continue
+			}
+
+			resp, err := http.Post(base_url, "application/json", bytes.NewReader(body))
+			if err != nil {
+				fmt.Println("HTTP request failed:", err)
+				continue
+			}
+			defer resp.Body.Close()
+
+			switch resp.StatusCode {
+			case http.StatusCreated:
+				fmt.Println("App added succesfully!!")
+				continue
+			case http.StatusConflict:
+				fmt.Println("Error: App already exists")
+				continue
+			case http.StatusBadRequest:
+				fmt.Println("Error: invalid app data")
+				continue
+			default:
+				respBody, _ := io.ReadAll(resp.Body)
+				fmt.Printf("Server error: %s\n", string(respBody))
+				//fmt.Println("HTTP Response Status:", resp.StatusCode, http.StatusText(resp.StatusCode))
+				continue
+			}
+
+		case "get":
+			if len(args) > 2 {
+				fmt.Println("You only need the app's name")
+				continue
+			}
+
+			name := args[1]
+			fmt.Println("Client requesting:", base_url + "/" + name)
+			resp, err := http.Get(base_url + "/" + name)
+			if err != nil {
+				fmt.Println("request failed: ", err)
+				continue
+			}
+			defer resp.Body.Close()
+
+			switch resp.StatusCode {
+			case http.StatusOK:
+				var apps []App
+				if err := json.NewDecoder(resp.Body).Decode(&apps); err != nil {
+					fmt.Println("Failed to parse response:", err)
+					continue
+				}
+				
+				for _, element := range apps {
+					fmt.Printf("%s was created in %d and its price is %f\n", element.Name, element.Born, element.Price)
+				}
+				continue
+
+			case http.StatusNotFound:
+				fmt.Println("Error: app not found.")
+				continue
+
+			case http.StatusBadRequest:
+				fmt.Println("Error: bad request.")
+				continue
+
+			default:
+				body, _ := io.ReadAll(resp.Body)
+				fmt.Printf("Server error: %s\n", string(body))
+				continue
+			}
+
+		case "list":
+			resp, err := http.Get(base_url)
+			if err != nil {
+				fmt.Println("request failed: ", err)
+				continue
+			}
+			defer resp.Body.Close()
+
+			switch resp.StatusCode {
+			case http.StatusOK:
+				var apps []App
+				if err := json.NewDecoder(resp.Body).Decode(&apps); err != nil {
+					fmt.Println("Failed to parse response:", err)
+					continue
+				} else {
+					for _, element := range apps {
+						fmt.Printf("%s was created in %d and its price is %f\n", element.Name, element.Born, element.Price)
+					}
+					continue
+				}
+
+			default:
+				body, _ := io.ReadAll(resp.Body)
+				fmt.Printf("Server error: %s\n", string(body))
+				continue
+			}
+
+		case "delete":
+			if len(args) != 4 {
+				fmt.Println("You need the name, year of creation, and price of the app!")
+				continue
+			}
+			name := args[1]
+			var dob int
+			var price float32
+			fmt.Sscanf(args[2], "%d", &dob)
+			fmt.Sscanf(args[3], "%f", &price)
+
+			a := App{Name: name, Born: dob, Price: price} // check for type  
+
+			body, err := json.Marshal(a)
+			if err != nil {
+				fmt.Println("Failed to format the user into JSON: ", err)
+				continue
+			}
+			req, err := http.NewRequest(http.MethodDelete, base_url, bytes.NewReader(body))
+			if err != nil {
+				fmt.Println("HTTP request failed:", err)
+				continue
+			}
+
+			req.Header.Set("Content-Type", "application/json" )
+
+			client := &http.Client{}
+			resp, err := client.Do(req)
+			if err != nil {
+				fmt.Println("HTTP request failed:", err)
+				continue	
+			}
+			defer resp.Body.Close()
+
+			switch resp.StatusCode {
+				case http.StatusOK:
+					fmt.Println("App deleted successfully!")
+					continue
+				case http.StatusNotFound:
+					fmt.Println("Error: app not found.")
+					continue
+				case http.StatusBadRequest:
+					fmt.Println("Error: bad request.")
+					continue
+				default:
+					respBody, _ := io.ReadAll(resp.Body)
+					fmt.Printf("Server error: %s\n", string(respBody))
+					continue
+			}
+
+		default:
+			fmt.Println("unknown command:", cmd)
+			fmt.Println("Type 'help' for a list of available commands. ")
+			continue
+		}
+	}
 }
+ 
 
-// change port to make it dynamic 
 func main() {
 	var port, endpoint string
 
@@ -261,6 +470,6 @@ func main() {
 	if endpoint=="users"{
 		userSide(port)
 	}else{
-		appSide()
+		appSide(port)
 	}
 }

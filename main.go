@@ -6,28 +6,18 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"rest_api/types"
 	"slices"
 	"strings"
 )
 
-type User struct {
-	Name string	`json:"name"`
-	Age  int	`json:"age"`
-}
-
-type App struct{
-	Name 	string	 `json:"name"`
-	Born 	int 	 `json:"born"`
-	Price 	float32  `json:"price"`
-}
-
-var Users = []User{
+var Users = []types.User{
 	{Name: "alice", Age: 42},
 	{Name: "mara", Age: 28},
 	{Name: "bob", Age: 26},
 }
 
-var Apps = []App{{Name: "Bible", Born: 1600, Price: 0.0}}
+var Apps = []types.App{{Name: "Bible", Born: 1600, Price: 0.0}}
 
 func healthcheck(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -51,11 +41,12 @@ func userManagement(w http.ResponseWriter, r *http.Request) {
 			}
 			if len(segments) > 1 {
 				http.Error(w, "Server-side Bad request: additional fields", http.StatusBadRequest)
+				//log.Println("Server-side Bad request: additional fields")
 				return
 			}
 
 			name := segments[0]
-			var matches []User
+			var matches []types.User
 			fmt.Printf("Searching for user: '%s'\n", name)
 			for _, p := range Users{
 				fmt.Printf("Comparing with: '%s'\n", p.Name)
@@ -74,7 +65,7 @@ func userManagement(w http.ResponseWriter, r *http.Request) {
 				
 
 		case http.MethodPost:
-			var p User
+			var p types.User
 
 			decoder := json.NewDecoder(r.Body)
 			decoder.DisallowUnknownFields()
@@ -104,7 +95,7 @@ func userManagement(w http.ResponseWriter, r *http.Request) {
 			return
 		
 		case http.MethodDelete:
-			var p User
+			var p types.User
 
 			decoder := json.NewDecoder(r.Body)
 			decoder.DisallowUnknownFields()
@@ -154,7 +145,7 @@ func appsManagement(w http.ResponseWriter, r *http.Request) {
 			}
 
 			name := segments[0]
-			var matches []App
+			var matches []types.App
 			for _, app := range Apps{
 				if app.Name == name {
 					matches = append(matches, app)
@@ -171,7 +162,7 @@ func appsManagement(w http.ResponseWriter, r *http.Request) {
 				
 
 		case http.MethodPost:
-			var app App
+			var app types.App
 
 			decoder := json.NewDecoder(r.Body)
 			decoder.DisallowUnknownFields()
@@ -201,7 +192,7 @@ func appsManagement(w http.ResponseWriter, r *http.Request) {
 			return
 		
 		case http.MethodDelete:
-			var app App
+			var app types.App
 
 			decoder := json.NewDecoder(r.Body)
 			decoder.DisallowUnknownFields()

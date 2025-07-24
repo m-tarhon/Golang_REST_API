@@ -9,18 +9,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"rest_api/types"
 )
-
-type User struct {
-	Name string `json:"name"`
-	Age  int    `json:"age"`
-}
-
-type App struct{
-	Name 	string	 `json:"name"`
-	Born 	int 	 `json:"born"`
-	Price 	float32  `json:"price"`
-}
 
 func userSide(port string) {
 	base_url := "http://localhost:" + port +"/users"
@@ -51,6 +41,10 @@ func userSide(port string) {
 
 		cmd := args[0]
 		switch cmd {
+		case "switch": 
+			fmt.Println("you're going to the app endpoint bye")
+			appSide(port)
+			
 		case "help":
 			fmt.Println("Commands: ")
 			fmt.Println(" 1. add <a user> <their age> --> adds an user")
@@ -68,7 +62,7 @@ func userSide(port string) {
 			var age int
 			fmt.Sscanf(args[2], "%d", &age)
 
-			u := User{Name: name, Age: age} // check for type 
+			u := types.User{Name: name, Age: age} // check for type 
 			body, err := json.Marshal(u)
 			if err != nil {
 				fmt.Println("Failed to format the user into JSON: ", err)
@@ -100,7 +94,7 @@ func userSide(port string) {
 			}
 
 		case "get":
-			if len(args) > 2 {
+			if len(args) != 2 {
 				fmt.Println("You only need the name")
 				continue
 			}
@@ -115,7 +109,7 @@ func userSide(port string) {
 
 			switch resp.StatusCode {
 			case http.StatusOK:
-				var users []User
+				var users []types.User
 				if err := json.NewDecoder(resp.Body).Decode(&users); err != nil {
 					fmt.Println("Failed to parse response:", err)
 					continue
@@ -150,7 +144,7 @@ func userSide(port string) {
 
 			switch resp.StatusCode {
 			case http.StatusOK:
-				var us []User
+				var us []types.User
 				if err := json.NewDecoder(resp.Body).Decode(&us); err != nil {
 					fmt.Println("Failed to parse response:", err)
 					continue
@@ -176,7 +170,7 @@ func userSide(port string) {
 			var age int
 			fmt.Sscanf(args[2], "%d", &age)
 
-			u := User{Name: name, Age: age}
+			u := types.User{Name: name, Age: age}
 
 			body, err := json.Marshal(u)
 			if err != nil {
@@ -272,7 +266,7 @@ func appSide(port string) {
 			fmt.Sscanf(args[2], "%d", &dob)
 			fmt.Sscanf(args[3], "%f", &price)
 
-			a := App{Name: name, Born: dob, Price: price} // check for type 
+			a := types.App{Name: name, Born: dob, Price: price} // check for type 
 			body, err := json.Marshal(a)
 			if err != nil {
 				fmt.Println("Failed to format the app's info into JSON: ", err)
@@ -304,7 +298,7 @@ func appSide(port string) {
 			}
 
 		case "get":
-			if len(args) > 2 {
+			if len(args) != 2 {
 				fmt.Println("You only need the app's name")
 				continue
 			}
@@ -320,7 +314,7 @@ func appSide(port string) {
 
 			switch resp.StatusCode {
 			case http.StatusOK:
-				var apps []App
+				var apps []types.App
 				if err := json.NewDecoder(resp.Body).Decode(&apps); err != nil {
 					fmt.Println("Failed to parse response:", err)
 					continue
@@ -355,7 +349,7 @@ func appSide(port string) {
 
 			switch resp.StatusCode {
 			case http.StatusOK:
-				var apps []App
+				var apps []types.App
 				if err := json.NewDecoder(resp.Body).Decode(&apps); err != nil {
 					fmt.Println("Failed to parse response:", err)
 					continue
@@ -383,7 +377,7 @@ func appSide(port string) {
 			fmt.Sscanf(args[2], "%d", &dob)
 			fmt.Sscanf(args[3], "%f", &price)
 
-			a := App{Name: name, Born: dob, Price: price} // check for type  
+			a := types.App{Name: name, Born: dob, Price: price} // check for type  
 
 			body, err := json.Marshal(a)
 			if err != nil {
@@ -429,7 +423,10 @@ func appSide(port string) {
 		}
 	}
 }
- 
+ // think about adding user authentication basic
+ // focus on making this less monolithic, bcs its horrible 
+ // add database man
+ // try adding besides http a way to get into https 
 
 func main() {
 	var port, endpoint string

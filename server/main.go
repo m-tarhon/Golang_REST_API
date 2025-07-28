@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"rest_api/types"
 	"slices"
 	"strings"
@@ -25,6 +27,21 @@ func healthcheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Fprintln(w, "status is: available")
+}
+
+func isValid(port string) bool {
+	pattern := `^([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$`
+	match, _ := regexp.MatchString(pattern, port)
+	return match
+}
+
+func isAvailable(port string) bool{
+	ln, err := net.Listen("tcp", ":"+port)
+	if err != nil{
+		return false
+	}
+	ln.Close()
+	return true
 }
 
 func userManagement(w http.ResponseWriter, r *http.Request) {
@@ -224,36 +241,43 @@ func appsManagement(w http.ResponseWriter, r *http.Request) {
 
 // maybe be able to parse sys args to specify a port, or check the sys for an available port
 func main() {
-
+	
 	fmt.Println("Hello Server, what port would you like to connect to?")
 
 	for{
-
 		//an improvement could be switching to scanner but its minimal 
 		reader := bufio.NewReader(os.Stdin)
-		line, err0 := reader.ReadString('\n')
+		port, err0 := reader.ReadString('\n')
 		if err0 != nil {
-			fmt.Print("STOPPED")
+			fmt.Print("STOPPED.")
 			return
 		}
 
-		line = strings.TrimSpace(line)
-		line = ":" + line
-		//fmt.Println(line)
-		
-		mux := http.NewServeMux()
-		mux.HandleFunc("/healthcheck", healthcheck)
-		mux.HandleFunc("/users", userManagement)
-		mux.HandleFunc("/users/", userManagement)
-		mux.HandleFunc("/apps", appsManagement)
-		mux.HandleFunc("/apps/", appsManagement)
+		port = strings.TrimSpace(port)
+		if port == "" { 
+			fmt.Println("Port cannot be empty, please try again.")
+			continue
+		}
 
-		// check to see if port is empty or not , to add 
-		// also add a way to see on which port the server is starting 
-		err := http.ListenAndServe(line, mux)
+		if !isValid(port) {
+			fmt.Println("Invalid format. Pick a port from 1-65336.")
+			continue
+		}
+
+		if !isAvailable(port){
+			fmt.Println("This port is busy. Try something else.")
+			continue
+		}
+
+		port = ":" + port
+		mux := SetupRoutes()
+
+		fmt.Printf("Starting server on port: %s ...\n", port)
+		err := http.ListenAndServe(port, mux)
 		if err != nil {
+			fmt.Print("Somethig unexpected happened: ")
 			fmt.Println(err)
-			fmt.Println("That port doesnt exist, the format is xxxx, where x is from [0,9]. Try again!")
+			fmt.Println("Maybe try again.")
 			continue
 		}
 	}

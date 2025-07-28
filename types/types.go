@@ -10,4 +10,3 @@ type App struct{
 	Born 	int 	 `json:"born"`
 	Price 	float32  `json:"price"`
 }
-

@@ -4,12 +4,17 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"rest_api/types"
+	"rest_api/validators"
 	"strings"
+)
+var ( 
+	Portflag = flag.String("port", "8080", "specifies which port to use to connect the server to")
 )
 
 func userSide(port, username, password string) {
@@ -434,22 +439,27 @@ func appSide(port string) {
 
 func main() {
 	var port, endpoint string
-
-	fmt.Println("Hello Client, which port do you want?")
-	for {
-		scanner := bufio.NewScanner(os.Stdin)
-		if !scanner.Scan() {
-			fmt.Print("STOPPED")
-			return
-		}
-		port = scanner.Text()
-		var port_int int
-		fmt.Sscanf(port, "%d", &port_int)
-		if port_int >= 1000 && port_int <= 9999 {
+	flag.Parse()
+	if !validators.IsFlag("port"){
+			
+		fmt.Println("Hello Client, which port do you want?")
+		for {
+			scanner := bufio.NewScanner(os.Stdin)
+			if !scanner.Scan() {
+				fmt.Print("STOPPED")
+				return
+			}
+			port = scanner.Text()
+			var port_int int
+			fmt.Sscanf(port, "%d", &port_int)
+			if !validators.IsValid(port){
+				fmt.Println("Nonexistent port, format is xxxx. Try again.")
+				continue
+			}
 			break
 		}
-		fmt.Println("Nonexistent port, format is xxxx. Try again.")
-		continue
+	} else{
+		port = *Portflag
 	}
 
 	fmt.Println("Which endpoint do you want to vist: type 'users' or 'apps'")

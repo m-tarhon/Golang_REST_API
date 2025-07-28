@@ -3,12 +3,12 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
-	"regexp"
 	"rest_api/types"
+	"rest_api/validators"
 	"slices"
 	"strings"
 )
@@ -21,27 +21,16 @@ var Users = []types.User{
 
 var Apps = []types.App{{Name: "Bible", Born: 1600, Price: 0.0}}
 
+var ( 
+	Portflag = flag.String("port", "8080", "specifies which port to use to connect the server to")
+)
+
 func healthcheck(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
 	}
 	fmt.Fprintln(w, "status is: available")
-}
-
-func isValid(port string) bool {
-	pattern := `^([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$`
-	match, _ := regexp.MatchString(pattern, port)
-	return match
-}
-
-func isAvailable(port string) bool{
-	ln, err := net.Listen("tcp", ":"+port)
-	if err != nil{
-		return false
-	}
-	ln.Close()
-	return true
 }
 
 func userManagement(w http.ResponseWriter, r *http.Request) {
@@ -64,9 +53,9 @@ func userManagement(w http.ResponseWriter, r *http.Request) {
 
 			name := segments[0]
 			var matches []types.User
-			fmt.Printf("Searching for user: '%s'\n", name)
+			//fmt.Printf("Searching for user: '%s'\n", name)
 			for _, p := range Users{
-				fmt.Printf("Comparing with: '%s'\n", p.Name)
+				//fmt.Printf("Comparing with: '%s'\n", p.Name)
 				if p.Name == name {
 					matches = append(matches, p)
 				}
@@ -241,34 +230,40 @@ func appsManagement(w http.ResponseWriter, r *http.Request) {
 
 // maybe be able to parse sys args to specify a port, or check the sys for an available port
 func main() {
-	
-	fmt.Println("Hello Server, what port would you like to connect to?")
+	var port string
+	flag.Parse()
 
-	for{
-		//an improvement could be switching to scanner but its minimal 
-		reader := bufio.NewReader(os.Stdin)
-		port, err0 := reader.ReadString('\n')
-		if err0 != nil {
-			fmt.Print("STOPPED.")
-			return
+	if !validators.IsFlag("port"){
+		fmt.Println("Hello Server, what port would you like to connect to?")
+
+		for{
+			//an improvement could be switching to scanner but its minimal 
+			reader := bufio.NewReader(os.Stdin)
+			port, err0 := reader.ReadString('\n')
+			if err0 != nil {
+				fmt.Print("STOPPED.")
+				return
+			}
+
+			port = strings.TrimSpace(port)
+			if port == "" { 
+				fmt.Println("Port cannot be empty, please try again.")
+				continue
+			}
+
+			if !validators.IsValid(port) {
+				fmt.Println("Invalid format. Pick a port from 1-65336.")
+				continue
+			}
+
+			if !validators.IsAvailable(port){
+				fmt.Println("This port is busy. Try something else.")
+				continue
+			}
+			break
 		}
-
-		port = strings.TrimSpace(port)
-		if port == "" { 
-			fmt.Println("Port cannot be empty, please try again.")
-			continue
-		}
-
-		if !isValid(port) {
-			fmt.Println("Invalid format. Pick a port from 1-65336.")
-			continue
-		}
-
-		if !isAvailable(port){
-			fmt.Println("This port is busy. Try something else.")
-			continue
-		}
-
+	}
+		port = *Portflag
 		port = ":" + port
 		mux := SetupRoutes()
 
@@ -278,7 +273,7 @@ func main() {
 			fmt.Print("Somethig unexpected happened: ")
 			fmt.Println(err)
 			fmt.Println("Maybe try again.")
-			continue
+			
 		}
-	}
+	
 }

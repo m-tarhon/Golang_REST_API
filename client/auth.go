@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -31,4 +32,24 @@ func AuthReq(username, password, port string) error {
 	}
 
 	return nil
+}
+
+func Helper4Auth(method, url, username, password string, body io.Reader) (*http.Response, error) {
+    req, err := http.NewRequest(method, url, body)
+        if err != nil{
+            return nil, err 
+        }
+
+        if username!="" && password!="" {
+            auth := base64.StdEncoding.EncodeToString([]byte(username +":" + password))
+            req.Header.Set("Authorization", "Basic " + auth)
+        }
+
+        if method==http.MethodPost || method == http.MethodDelete{
+            req.Header.Set("Content-Type", "application/json")
+        }
+
+        client := &http.Client{}
+        return client.Do(req)
+
 }

@@ -423,7 +423,6 @@ func appSide(port string) {
 		}
 	}
 }
- // think about adding user authentication basic
  // focus on making this less monolithic, bcs its horrible 
  // add database man
  // try adding besides http a way to get into https 
@@ -464,7 +463,25 @@ func main() {
 			continue
 	}
 
+	//if you dont have the boss:man credentials wont be allowed to get into users 
 	if endpoint=="users"{
+		for {
+			var username, password string
+			fmt.Println("This endpoint requires authentication")
+			fmt.Println("please give your username: ")
+			fmt.Scanln(&username)
+
+			fmt.Println("please give your password: ")
+			fmt.Scanln(&password)
+
+			err := AuthReq(username, password, port )
+			if err != nil {
+				fmt.Printf("Auth error: %v\n", err)
+				fmt.Println("try again")
+				continue
+			}
+			break
+		}
 		userSide(port)
 	}else{
 		appSide(port)

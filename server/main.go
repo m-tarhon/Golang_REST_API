@@ -3,10 +3,12 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"rest_api/types"
+	"rest_api/validators"
 	"slices"
 	"strings"
 )
@@ -18,6 +20,10 @@ var Users = []types.User{
 }
 
 var Apps = []types.App{{Name: "Bible", Born: 1600, Price: 0.0}}
+
+var ( 
+	Portflag = flag.String("port", "8080", "specifies which port to use to connect the server to")
+)
 
 func healthcheck(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -47,9 +53,9 @@ func userManagement(w http.ResponseWriter, r *http.Request) {
 
 			name := segments[0]
 			var matches []types.User
-			fmt.Printf("Searching for user: '%s'\n", name)
+			//fmt.Printf("Searching for user: '%s'\n", name)
 			for _, p := range Users{
-				fmt.Printf("Comparing with: '%s'\n", p.Name)
+				//fmt.Printf("Comparing with: '%s'\n", p.Name)
 				if p.Name == name {
 					matches = append(matches, p)
 				}
@@ -224,37 +230,50 @@ func appsManagement(w http.ResponseWriter, r *http.Request) {
 
 // maybe be able to parse sys args to specify a port, or check the sys for an available port
 func main() {
+	var port string
+	flag.Parse()
 
-	fmt.Println("Hello Server, what port would you like to connect to?")
+	if !validators.IsFlag("port"){
+		fmt.Println("Hello Server, what port would you like to connect to?")
 
-	for{
+		for{
+			//an improvement could be switching to scanner but its minimal 
+			reader := bufio.NewReader(os.Stdin)
+			port, err0 := reader.ReadString('\n')
+			if err0 != nil {
+				fmt.Print("STOPPED.")
+				return
+			}
 
-		//an improvement could be switching to scanner but its minimal 
-		reader := bufio.NewReader(os.Stdin)
-		line, err0 := reader.ReadString('\n')
-		if err0 != nil {
-			fmt.Print("STOPPED")
-			return
-		}
+			port = strings.TrimSpace(port)
+			if port == "" { 
+				fmt.Println("Port cannot be empty, please try again.")
+				continue
+			}
 
-		line = strings.TrimSpace(line)
-		line = ":" + line
-		//fmt.Println(line)
-		
-		mux := http.NewServeMux()
-		mux.HandleFunc("/healthcheck", healthcheck)
-		mux.HandleFunc("/users", userManagement)
-		mux.HandleFunc("/users/", userManagement)
-		mux.HandleFunc("/apps", appsManagement)
-		mux.HandleFunc("/apps/", appsManagement)
+			if !validators.IsValid(port) {
+				fmt.Println("Invalid format. Pick a port from 1-65336.")
+				continue
+			}
 
-		// check to see if port is empty or not , to add 
-		// also add a way to see on which port the server is starting 
-		err := http.ListenAndServe(line, mux)
-		if err != nil {
-			fmt.Println(err)
-			fmt.Println("That port doesnt exist, the format is xxxx, where x is from [0,9]. Try again!")
-			continue
+			if !validators.IsAvailable(port){
+				fmt.Println("This port is busy. Try something else.")
+				continue
+			}
+			break
 		}
 	}
+		port = *Portflag
+		port = ":" + port
+		mux := SetupRoutes()
+
+		fmt.Printf("Starting server on port: %s ...\n", port)
+		err := http.ListenAndServe(port, mux)
+		if err != nil {
+			fmt.Print("Somethig unexpected happened: ")
+			fmt.Println(err)
+			fmt.Println("Maybe try again.")
+			
+		}
+	
 }

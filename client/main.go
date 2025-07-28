@@ -4,16 +4,21 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"strings"
 	"rest_api/types"
+	"rest_api/validators"
+	"strings"
+)
+var ( 
+	Portflag = flag.String("port", "8080", "specifies which port to use to connect the server to")
 )
 
-func userSide(port string) {
-	base_url := "http://localhost:" + port +"/users"
+func userSide(port, username, password string) {
+	base_url := "http://localhost:" + port + "/users"
 	fmt.Println("User Client, type help for options or exit to quit")
 	scanner := bufio.NewScanner(os.Stdin)
 
@@ -41,10 +46,10 @@ func userSide(port string) {
 
 		cmd := args[0]
 		switch cmd {
-		case "switch": 
+		case "switch":
 			fmt.Println("you're going to the app endpoint bye")
 			appSide(port)
-			
+
 		case "help":
 			fmt.Println("Commands: ")
 			fmt.Println(" 1. add <a user> <their age> --> adds an user")
@@ -52,6 +57,7 @@ func userSide(port string) {
 			fmt.Println(" 3. list --> which returns all users")
 			fmt.Println(" 4. delete <name> <age> --> delets an user's info")
 			fmt.Println(" 5. exit")
+			fmt.Println(" 6. switch --> takes you to the app endpoint")
 
 		case "add":
 			if len(args) != 3 {
@@ -62,14 +68,15 @@ func userSide(port string) {
 			var age int
 			fmt.Sscanf(args[2], "%d", &age)
 
-			u := types.User{Name: name, Age: age} // check for type 
+			u := types.User{Name: name, Age: age} // check for type
 			body, err := json.Marshal(u)
 			if err != nil {
 				fmt.Println("Failed to format the user into JSON: ", err)
 				continue
 			}
 
-			resp, err := http.Post(base_url, "application/json", bytes.NewReader(body))
+			//resp, err := http.Post(base_url, "application/json", bytes.NewReader(body))
+			resp, err := Helper4Auth(http.MethodPost, base_url, username, password, bytes.NewReader(body))
 			if err != nil {
 				fmt.Println("HTTP request failed:", err)
 				continue
@@ -100,7 +107,7 @@ func userSide(port string) {
 			}
 
 			name := args[1]
-			resp, err := http.Get(base_url + "/" + name)
+			resp, err := Helper4Auth(http.MethodGet, base_url+"/"+name, username, password, nil)
 			if err != nil {
 				fmt.Println("request failed: ", err)
 				continue
@@ -114,7 +121,7 @@ func userSide(port string) {
 					fmt.Println("Failed to parse response:", err)
 					continue
 				}
-				
+
 				for _, u := range users {
 					fmt.Printf("%s's age is %d\n", u.Name, u.Age)
 				}
@@ -135,7 +142,8 @@ func userSide(port string) {
 			}
 
 		case "list":
-			resp, err := http.Get(base_url)
+			//resp, err := http.Get(base_url)
+			resp, err := Helper4Auth(http.MethodGet, base_url, username, password, nil)
 			if err != nil {
 				fmt.Println("request failed: ", err)
 				continue
@@ -177,36 +185,37 @@ func userSide(port string) {
 				fmt.Println("Failed to format the user into JSON: ", err)
 				continue
 			}
-			req, err := http.NewRequest(http.MethodDelete, base_url, bytes.NewReader(body))
+			// req, err := http.NewRequest(http.MethodDelete, base_url, bytes.NewReader(body))
+			resp, err := Helper4Auth(http.MethodDelete, base_url, username, password, bytes.NewReader(body))
 			if err != nil {
 				fmt.Println("HTTP request failed:", err)
 				continue
 			}
 
-			req.Header.Set("Content-Type", "application/json" )
+			// req.Header.Set("Content-Type", "application/json")
 
-			client := &http.Client{}
-			resp, err := client.Do(req)
-			if err != nil {
-				fmt.Println("HTTP request failed:", err)
-				continue	
-			}
+			// client := &http.Client{}
+			// resp, err := client.Do(req)
+			// if err != nil {
+			// 	fmt.Println("HTTP request failed:", err)
+			// 	continue
+			// }
 			defer resp.Body.Close()
 
 			switch resp.StatusCode {
-				case http.StatusOK:
-					fmt.Println("User deleted successfully!")
-					continue
-				case http.StatusNotFound:
-					fmt.Println("Error: user not found.")
-					continue
-				case http.StatusBadRequest:
-					fmt.Println("Error: bad request.")
-					continue
-				default:
-					respBody, _ := io.ReadAll(resp.Body)
-					fmt.Printf("Server error: %s\n", string(respBody))
-					continue
+			case http.StatusOK:
+				fmt.Println("User deleted successfully!")
+				continue
+			case http.StatusNotFound:
+				fmt.Println("Error: user not found.")
+				continue
+			case http.StatusBadRequest:
+				fmt.Println("Error: bad request.")
+				continue
+			default:
+				respBody, _ := io.ReadAll(resp.Body)
+				fmt.Printf("Server error: %s\n", string(respBody))
+				continue
 			}
 
 		default:
@@ -218,7 +227,7 @@ func userSide(port string) {
 }
 
 func appSide(port string) {
-	base_url := "http://localhost:" + port +"/apps"
+	base_url := "http://localhost:" + port + "/apps"
 
 	fmt.Println("App Client, type help for options or exit to quit")
 	scanner := bufio.NewScanner(os.Stdin)
@@ -266,7 +275,7 @@ func appSide(port string) {
 			fmt.Sscanf(args[2], "%d", &dob)
 			fmt.Sscanf(args[3], "%f", &price)
 
-			a := types.App{Name: name, Born: dob, Price: price} // check for type 
+			a := types.App{Name: name, Born: dob, Price: price} // check for type
 			body, err := json.Marshal(a)
 			if err != nil {
 				fmt.Println("Failed to format the app's info into JSON: ", err)
@@ -304,7 +313,7 @@ func appSide(port string) {
 			}
 
 			name := args[1]
-			fmt.Println("Client requesting:", base_url + "/" + name)
+			fmt.Println("Client requesting:", base_url+"/"+name)
 			resp, err := http.Get(base_url + "/" + name)
 			if err != nil {
 				fmt.Println("request failed: ", err)
@@ -319,7 +328,7 @@ func appSide(port string) {
 					fmt.Println("Failed to parse response:", err)
 					continue
 				}
-				
+
 				for _, element := range apps {
 					fmt.Printf("%s was created in %d and its price is %f\n", element.Name, element.Born, element.Price)
 				}
@@ -377,7 +386,7 @@ func appSide(port string) {
 			fmt.Sscanf(args[2], "%d", &dob)
 			fmt.Sscanf(args[3], "%f", &price)
 
-			a := types.App{Name: name, Born: dob, Price: price} // check for type  
+			a := types.App{Name: name, Born: dob, Price: price} // check for type
 
 			body, err := json.Marshal(a)
 			if err != nil {
@@ -390,30 +399,30 @@ func appSide(port string) {
 				continue
 			}
 
-			req.Header.Set("Content-Type", "application/json" )
+			req.Header.Set("Content-Type", "application/json")
 
 			client := &http.Client{}
 			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("HTTP request failed:", err)
-				continue	
+				continue
 			}
 			defer resp.Body.Close()
 
 			switch resp.StatusCode {
-				case http.StatusOK:
-					fmt.Println("App deleted successfully!")
-					continue
-				case http.StatusNotFound:
-					fmt.Println("Error: app not found.")
-					continue
-				case http.StatusBadRequest:
-					fmt.Println("Error: bad request.")
-					continue
-				default:
-					respBody, _ := io.ReadAll(resp.Body)
-					fmt.Printf("Server error: %s\n", string(respBody))
-					continue
+			case http.StatusOK:
+				fmt.Println("App deleted successfully!")
+				continue
+			case http.StatusNotFound:
+				fmt.Println("Error: app not found.")
+				continue
+			case http.StatusBadRequest:
+				fmt.Println("Error: bad request.")
+				continue
+			default:
+				respBody, _ := io.ReadAll(resp.Body)
+				fmt.Printf("Server error: %s\n", string(respBody))
+				continue
 			}
 
 		default:
@@ -423,50 +432,73 @@ func appSide(port string) {
 		}
 	}
 }
- // think about adding user authentication basic
- // focus on making this less monolithic, bcs its horrible 
- // add database man
- // try adding besides http a way to get into https 
+
+// focus on making this less monolithic, bcs its horrible
+// add database man
+// try adding besides http a way to get into https
 
 func main() {
 	var port, endpoint string
-
-	fmt.Println("Hello Client, which port do you want?")
-	for{
-		scanner := bufio.NewScanner(os.Stdin)
-		if !scanner.Scan(){
-			fmt.Print("STOPPED")
+	flag.Parse()
+	if !validators.IsFlag("port"){
+			
+		fmt.Println("Hello Client, which port do you want?")
+		for {
+			scanner := bufio.NewScanner(os.Stdin)
+			if !scanner.Scan() {
+				fmt.Print("STOPPED")
 				return
-		}
-		port = scanner.Text()
-		var port_int int
-		fmt.Sscanf(port, "%d", &port_int)
-		if port_int>=1000 && port_int<=9999{
+			}
+			port = scanner.Text()
+			var port_int int
+			fmt.Sscanf(port, "%d", &port_int)
+			if !validators.IsValid(port){
+				fmt.Println("Nonexistent port, format is xxxx. Try again.")
+				continue
+			}
 			break
 		}
-		fmt.Println("Nonexistent port, format is xxxx. Try again.")
-		continue
+	} else{
+		port = *Portflag
 	}
 
 	fmt.Println("Which endpoint do you want to vist: type 'users' or 'apps'")
-	for{
+	for {
 		scanner := bufio.NewScanner(os.Stdin)
-		if !scanner.Scan(){
+		if !scanner.Scan() {
 			fmt.Print("STOPPED")
-				return
+			return
 		}
 		endpoint = scanner.Text()
 
-		if endpoint== "users" || endpoint == "apps"{
+		if endpoint == "users" || endpoint == "apps" {
 			break
 		}
 		fmt.Println("Nonexistent endpoint, try again.")
-			continue
+		continue
 	}
 
-	if endpoint=="users"{
-		userSide(port)
-	}else{
+	//if you dont have the boss:man credentials wont be allowed to get into users
+	if endpoint == "users" {
+		var username, password string
+		for {
+			fmt.Println("This endpoint requires authentication")
+			fmt.Println("please give your username: ")
+			fmt.Scanln(&username)
+
+			fmt.Println("please give your password: ")
+			fmt.Scanln(&password)
+
+			err := AuthReq(username, password, port)
+			if err != nil {
+				fmt.Printf("Auth error: %v\n", err)
+				fmt.Println("try again")
+				continue
+			}
+			break
+		}
+		userSide(port, username, password)
+	} else {
 		appSide(port)
 	}
 }

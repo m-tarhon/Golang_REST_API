@@ -434,7 +434,6 @@ func appSide(port string) {
 }
 
 // focus on making this less monolithic, bcs its horrible
-// add database man
 // try adding besides http a way to get into https
 
 func main() {

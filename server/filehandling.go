@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"log"
 	"os"
@@ -9,11 +10,15 @@ import (
 )
 
 const path = "./db/users.json"
-const path1 = "./db/apps.json"
+const path1 = "./db/apps.jsonl"
+
+// for apps impelemt a way to access the file without saving it in memory , it would probs be better
+// try getting logs and see if you can measure latency and memory usage betweeen the 2 implementations
 
 func LoadUsers() {
 	fileBytes, err := os.ReadFile(path)
 	if err != nil {
+		// if the file doesnt exist create it cuz i dont think im doing that here
 		if os.IsNotExist(err) {
 			log.Println("users.json not found, starting with an empty user list.")
 			Users = []types.User{}
@@ -48,37 +53,83 @@ func SaveUsers() {
 	}
 }
 
-func LoadApps() {
-	fileBytes,err := os.ReadFile(path1)
+func LoadApps(name string) ([]types.App, error) {
+	file, err := os.Open(path1)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Println("apps.json not found. starting with am empty list")
-			Apps = []types.App{}
-			return 
+			return []types.App{}, nil
 		}
-		log.Fatalf("failed to read apps.json: %v", err)
+		return nil, err
 	}
-	err = json.Unmarshal(fileBytes, &Apps)
-	if err != nil {
-		log.Fatalf("failed to parse apps.json: %v", err)
+	defer file.Close()
+
+	var matches []types.App
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		var app types.App
+		if err := json.Unmarshal(scanner.Bytes(), &app); err != nil {
+			continue
+		}
+		if name == "" || app.Name == name {
+			matches = append(matches, app)
+		}
 	}
+	return matches, scanner.Err()
 }
 
-func SaveApps() { 
-	dir := filepath.Dir(path1)
-	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-		log.Printf("Failed to create db directory: %v", err)
-		return 
+func AppendApp(app types.App) error {
+	file, err := os.OpenFile(path1, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	return encoder.Encode(app)
+}
+
+func DeleteApp(target types.App) (bool, error) {
+	input, err := os.Open(path1)
+	if err != nil {
+		return false, err
+	}
+	defer input.Close()
+
+	tempPath := path1 + ".tmp"
+	output, err := os.Create(tempPath)
+	if err != nil {
+		return false, err
+	}
+	defer output.Close()
+
+	scanner := bufio.NewScanner(input)
+	writer := bufio.NewWriter(output)
+	found := false
+
+	for scanner.Scan() {
+		var app types.App
+		if err := json.Unmarshal(scanner.Bytes(), &app); err != nil {
+			continue
+		}
+
+		if app.Name == target.Name && app.Born == target.Born && app.Price == target.Price {
+			found = true
+			continue // skip writing this one
+		}
+
+		writer.Write(scanner.Bytes())
+		writer.Write([]byte("\n"))
+	}
+	writer.Flush()
+	input.Close()
+	output.Close()
+
+	if found {
+		os.Rename(tempPath, path1)
+	} else {
+		os.Remove(tempPath)
 	}
 
-	fileBytes, err := json.MarshalIndent(Apps, "", "  ")
-	if err != nil {
-		log.Printf("Failed to marshal apps: %v", err)
-		return
-	}
+	return found, scanner.Err()
 
-	err = os.WriteFile(path1, fileBytes, 0644)
-	if err != nil {
-		log.Printf("Failed to write apps.json: %v", err)
-	}
 }

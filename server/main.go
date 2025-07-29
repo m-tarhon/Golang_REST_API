@@ -128,44 +128,38 @@ func userManagement(w http.ResponseWriter, r *http.Request) {
 
 func appsManagement(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println("appsManagement called with path:", r.URL.Path)
-
 	path := strings.TrimPrefix(r.URL.Path, "/apps")
 	path = strings.Trim(path, "/")
-
 	segments := strings.Split(path, "/")
-	LoadApps()
 
 	switch r.Method {
 	case http.MethodGet:
-		//fmt.Println("appsManagement called with path:", r.URL.Path)
-		if path == "" {
-			json.NewEncoder(w).Encode(Apps)
-			return
-		}
 		if len(segments) > 1 {
 			http.Error(w, "Server-side Bad request: additional fields", http.StatusBadRequest)
 			return
 		}
 
-		name := segments[0]
-		var matches []types.App
-		for _, app := range Apps {
-			if app.Name == name {
-				matches = append(matches, app)
-			}
+		name := ""
+		if len(segments)==1{
+			name = segments[0]
 		}
 
-		if len(matches) == 0 {
-			http.Error(w, "Server-side: No such apps", http.StatusNotFound)
+		apps, err := LoadApps(name)
+		if err != nil {
+			http.Error(w, "Failed to load apps", http.StatusInternalServerError)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(matches)
+		if len(apps) == 0 && name != "" {
+			http.Error(w, "No such app found", http.StatusNotFound)
+			return
+		}		
+
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		json.NewEncoder(w).Encode(apps)
 
 	case http.MethodPost:
 		var app types.App
-
 		decoder := json.NewDecoder(r.Body)
 		decoder.DisallowUnknownFields()
 		err := decoder.Decode(&app)
@@ -179,6 +173,12 @@ func appsManagement(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		Apps, err := LoadApps(app.Name)
+		if err != nil {
+			http.Error(w, "Error when checking for duplicates", http.StatusInternalServerError)
+			return
+		}
+
 		for _, element := range Apps {
 			if element.Name == app.Name && element.Born == app.Born && element.Price == app.Price {
 				http.Error(w, "Server-side: that application already exists.", http.StatusConflict)
@@ -186,17 +186,17 @@ func appsManagement(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		Apps = append(Apps, app)
-		SaveApps()
-		w.Header().Set("Content-Type", "application/json")
+		if err := AppendApp(app); err != nil {
+			http.Error(w, "Failed to write app", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/x-ndjson")
 		w.WriteHeader(http.StatusCreated)
 		w.Write([]byte(`{"message": "Server-side App created succesfully!"}`))
-		json.NewEncoder(w).Encode(Apps)
 		return
 
 	case http.MethodDelete:
 		var app types.App
-
 		decoder := json.NewDecoder(r.Body)
 		decoder.DisallowUnknownFields()
 		err := decoder.Decode(&app)
@@ -205,20 +205,18 @@ func appsManagement(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		for i, element := range Apps {
-			if element.Name == app.Name && element.Born == app.Born && element.Price == app.Price {
-				Apps = slices.Delete(Apps, i, i+1)
-				SaveApps()
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"message": "Server-side App deleted succesfully!"}`))
-				json.NewEncoder(w).Encode(Apps)
-				return
-			}
+		found, err := DeleteApp(app)
+		if err != nil {
+			http.Error(w, "Failed to delete", http.StatusInternalServerError)
+			return
+		}
+		if !found {
+			http.Error(w, "App not found", http.StatusNotFound)
+			return
 		}
 
-		http.Error(w, "Server-side: App doesn't exist", http.StatusNotFound)
-		return
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"message": "App deleted successfully!"}`))
 
 	default:
 		http.Error(w, "Server-side method not allowed", http.StatusMethodNotAllowed)

@@ -1,0 +1,12 @@
+[
+  {
+    "name": "Bible",
+    "born": 1600,
+    "price": 0
+  },
+  {
+    "name": "Quran",
+    "born": 1600,
+    "price": 25
+  }
+]

@@ -489,7 +489,6 @@ func appSide(port string, client *http.Client) {
 }
 
 // focus on making this less monolithic, bcs its horrible
-// try adding besides http a way to get into https
 func main() {
 	var port, endpoint string
 	flag.Parse()

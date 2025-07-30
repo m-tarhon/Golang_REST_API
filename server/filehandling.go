@@ -12,7 +12,6 @@ import (
 const path = "./db/users.json"
 const path1 = "./db/apps.jsonl"
 
-// for apps impelemt a way to access the file without saving it in memory , it would probs be better
 // try getting logs and see if you can measure latency and memory usage betweeen the 2 implementations
 
 func LoadUsers() {

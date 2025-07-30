@@ -8,8 +8,8 @@ import (
 )
 
 func AuthReq(username, password, port string) error {
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:%s/users", port), nil)
+	client := GetAuthClient(username, password)
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://localhost:%s/users", port), nil)
 
 	if err != nil {
 		return err
@@ -30,7 +30,7 @@ func AuthReq(username, password, port string) error {
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		return fmt.Errorf("authentication failed: %s", resp.Status)
 	}
-
+	// If auth succeeds, return nil
 	return nil
 }
 
@@ -40,16 +40,9 @@ func Helper4Auth(method, url, username, password string, body io.Reader) (*http.
             return nil, err 
         }
 
-        if username!="" && password!="" {
-            auth := base64.StdEncoding.EncodeToString([]byte(username +":" + password))
-            req.Header.Set("Authorization", "Basic " + auth)
-        }
-
         if method==http.MethodPost || method == http.MethodDelete{
             req.Header.Set("Content-Type", "application/json")
         }
 
-        client := &http.Client{}
-        return client.Do(req)
-
+		return SharedClient.Do(req)
 }

@@ -13,12 +13,15 @@ import (
 	"rest_api/validators"
 	"strings"
 )
-var ( 
+
+var (
 	Portflag = flag.String("port", "8080", "specifies which port to use to connect the server to")
 )
 
-func userSide(port, username, password string) {
-	base_url := "http://localhost:" + port + "/users"
+var SharedClient *http.Client
+
+func userSide(port string, client *http.Client) {
+	base_url := "https://localhost:" + port + "/users"
 	fmt.Println("User Client, type help for options or exit to quit")
 	scanner := bufio.NewScanner(os.Stdin)
 
@@ -47,8 +50,12 @@ func userSide(port, username, password string) {
 		cmd := args[0]
 		switch cmd {
 		case "switch":
-			fmt.Println("you're going to the app endpoint bye")
-			appSide(port)
+			fmt.Println("Going to the app endpoint, bye!")
+			appClient := GetAuthClient("", "")
+			appSide(port, appClient)
+
+			fmt.Println("\nBack to the user endpoint, type help for options or exit to quit")
+			continue
 
 		case "help":
 			fmt.Println("Commands: ")
@@ -75,10 +82,16 @@ func userSide(port, username, password string) {
 				continue
 			}
 
-			//resp, err := http.Post(base_url, "application/json", bytes.NewReader(body))
-			resp, err := Helper4Auth(http.MethodPost, base_url, username, password, bytes.NewReader(body))
+			req, err := http.NewRequest(http.MethodPost, base_url, bytes.NewReader(body))
 			if err != nil {
-				fmt.Println("HTTP request failed:", err)
+				fmt.Println("Request creation failed:", err)
+				continue
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := client.Do(req)
+			if err != nil {
+				fmt.Println("Request failed:", err)
 				continue
 			}
 			defer resp.Body.Close()
@@ -96,7 +109,6 @@ func userSide(port, username, password string) {
 			default:
 				respBody, _ := io.ReadAll(resp.Body)
 				fmt.Printf("Server error: %s\n", string(respBody))
-				//fmt.Println("HTTP Response Status:", resp.StatusCode, http.StatusText(resp.StatusCode))
 				continue
 			}
 
@@ -107,9 +119,17 @@ func userSide(port, username, password string) {
 			}
 
 			name := args[1]
-			resp, err := Helper4Auth(http.MethodGet, base_url+"/"+name, username, password, nil)
+			
+			req, err := http.NewRequest(http.MethodGet, base_url+"/"+name, nil)
 			if err != nil {
-				fmt.Println("request failed: ", err)
+				fmt.Println("Request creation failed:", err)
+				continue
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := client.Do(req)
+			if err != nil {
+				fmt.Println("Request failed:", err)
 				continue
 			}
 			defer resp.Body.Close()
@@ -142,10 +162,15 @@ func userSide(port, username, password string) {
 			}
 
 		case "list":
-			//resp, err := http.Get(base_url)
-			resp, err := Helper4Auth(http.MethodGet, base_url, username, password, nil)
+			req, err := http.NewRequest(http.MethodGet, base_url, nil)
 			if err != nil {
 				fmt.Println("request failed: ", err)
+				continue
+			}
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := client.Do(req)
+			if err != nil {
+				fmt.Println("Request failed:", err)
 				continue
 			}
 			defer resp.Body.Close()
@@ -185,21 +210,19 @@ func userSide(port, username, password string) {
 				fmt.Println("Failed to format the user into JSON: ", err)
 				continue
 			}
-			// req, err := http.NewRequest(http.MethodDelete, base_url, bytes.NewReader(body))
-			resp, err := Helper4Auth(http.MethodDelete, base_url, username, password, bytes.NewReader(body))
+
+			req, err := http.NewRequest(http.MethodDelete, base_url, bytes.NewReader(body))
 			if err != nil {
 				fmt.Println("HTTP request failed:", err)
 				continue
 			}
 
-			// req.Header.Set("Content-Type", "application/json")
-
-			// client := &http.Client{}
-			// resp, err := client.Do(req)
-			// if err != nil {
-			// 	fmt.Println("HTTP request failed:", err)
-			// 	continue
-			// }
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := client.Do(req)
+			if err != nil {
+				fmt.Println("HTTP request failed:", err)
+				continue
+			}
 			defer resp.Body.Close()
 
 			switch resp.StatusCode {
@@ -226,8 +249,8 @@ func userSide(port, username, password string) {
 	}
 }
 
-func appSide(port string) {
-	base_url := "http://localhost:" + port + "/apps"
+func appSide(port string, client *http.Client) {
+	base_url := "https://localhost:" + port + "/apps"
 
 	fmt.Println("App Client, type help for options or exit to quit")
 	scanner := bufio.NewScanner(os.Stdin)
@@ -282,7 +305,19 @@ func appSide(port string) {
 				continue
 			}
 
-			resp, err := http.Post(base_url, "application/json", bytes.NewReader(body))
+			// resp, err := http.Post(base_url, "application/json", bytes.NewReader(body))
+			// if err != nil {
+			// 	fmt.Println("HTTP request failed:", err)
+			// 	continue
+			// }
+			req, err := http.NewRequest(http.MethodPost, base_url, bytes.NewReader(body))
+			if err != nil {
+				fmt.Println("HTTP request failed:", err)
+				continue
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("HTTP request failed:", err)
 				continue
@@ -313,10 +348,21 @@ func appSide(port string) {
 			}
 
 			name := args[1]
-			fmt.Println("Client requesting:", base_url+"/"+name)
-			resp, err := http.Get(base_url + "/" + name)
+			//fmt.Println("Client requesting:", base_url+"/"+name)
+			// resp, err := http.Get(base_url + "/" + name)
+			// if err != nil {
+			// 	fmt.Println("request failed: ", err)
+			// 	continue
+			// }
+
+			req, err := http.NewRequest(http.MethodGet, base_url+"/"+name, nil)
 			if err != nil {
-				fmt.Println("request failed: ", err)
+				fmt.Println("Request creation failed:", err)
+				continue
+			}
+			resp, err := client.Do(req)
+			if err != nil {
+				fmt.Println("Request failed:", err)
 				continue
 			}
 			defer resp.Body.Close()
@@ -349,9 +395,19 @@ func appSide(port string) {
 			}
 
 		case "list":
-			resp, err := http.Get(base_url)
+			// resp, err := http.Get(base_url)
+			// if err != nil {
+			// 	fmt.Println("request failed: ", err)
+			// 	continue
+			// }
+			req, err := http.NewRequest(http.MethodGet, base_url, nil)
 			if err != nil {
-				fmt.Println("request failed: ", err)
+				fmt.Println("Request creation failed:", err)
+				continue
+			}
+			resp, err := client.Do(req)
+			if err != nil {
+				fmt.Println("Request failed:", err)
 				continue
 			}
 			defer resp.Body.Close()
@@ -401,7 +457,6 @@ func appSide(port string) {
 
 			req.Header.Set("Content-Type", "application/json")
 
-			client := &http.Client{}
 			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Println("HTTP request failed:", err)
@@ -435,12 +490,11 @@ func appSide(port string) {
 
 // focus on making this less monolithic, bcs its horrible
 // try adding besides http a way to get into https
-
 func main() {
 	var port, endpoint string
 	flag.Parse()
-	if !validators.IsFlag("port"){
-			
+	if !validators.IsFlag("port") {
+
 		fmt.Println("Hello Client, which port do you want?")
 		for {
 			scanner := bufio.NewScanner(os.Stdin)
@@ -451,13 +505,13 @@ func main() {
 			port = scanner.Text()
 			var port_int int
 			fmt.Sscanf(port, "%d", &port_int)
-			if !validators.IsValid(port){
+			if !validators.IsValid(port) {
 				fmt.Println("Nonexistent port, format is xxxx. Try again.")
 				continue
 			}
 			break
 		}
-	} else{
+	} else {
 		port = *Portflag
 	}
 
@@ -496,8 +550,9 @@ func main() {
 			}
 			break
 		}
-		userSide(port, username, password)
+		SharedClient = GetAuthClient(username, password)
+		userSide(port, SharedClient)
 	} else {
-		appSide(port)
-	}
+		SharedClient = GetAuthClient("", "")
+		appSide(port, SharedClient)	}
 }

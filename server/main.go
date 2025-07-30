@@ -266,12 +266,17 @@ func main() {
 	mux := SetupRoutes()
 
 	fmt.Printf("Starting server on port %s ...\n", port)
-	err := http.ListenAndServe(port, mux)
-	if err != nil {
+	// err := http.ListenAndServe(port, mux)
+	// if err != nil {
+	// 	fmt.Print("Somethig unexpected happened: ")
+	// 	fmt.Println(err)
+	// 	fmt.Println("Maybe try again.")
+	//}
+
+	errs := http.ListenAndServeTLS(port, "cert.pem", "key.pem", mux)
+	if errs != nil{
 		fmt.Print("Somethig unexpected happened: ")
-		fmt.Println(err)
+		fmt.Println(errs)
 		fmt.Println("Maybe try again.")
-
 	}
-
 }

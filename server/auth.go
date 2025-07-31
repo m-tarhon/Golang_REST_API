@@ -28,7 +28,6 @@ func basicAuth(next http.HandlerFunc) http.HandlerFunc {
             return
         }
 
-        // Auth successful
         next.ServeHTTP(w, r)
     }
 }

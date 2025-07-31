@@ -1,9 +1,13 @@
 package validators
 
 import (
+	"bufio"
 	"flag"
+	"fmt"
 	"net"
+	"os"
 	"regexp"
+	"strings"
 )
 
 func IsValid(port string) bool {
@@ -29,4 +33,37 @@ func IsFlag(name string) bool{
 		}
 	})
 	return found
+}
+
+
+func SMTH(flag string, port *string){
+
+	fmt.Printf("Hello Server, what %s port would you like to connect to?", flag)
+
+	for {
+		reader := bufio.NewReader(os.Stdin)
+		port1, err0 := reader.ReadString('\n')
+		if err0 != nil {
+			fmt.Print("STOPPED.")
+			return 
+		}
+
+		port1 = strings.TrimSpace(port1)
+		if port1 == "" {
+			fmt.Println("Port cannot be empty, please try again.")
+			continue
+		}
+
+		if !IsValid(port1) {
+			fmt.Println("Invalid format. Pick a port from 1-65336.")
+			continue
+		}
+
+		if !IsAvailable(port1) {
+			fmt.Println("This port is busy. Try something else.")
+			continue
+		}
+		*port = port1
+		break
+	}
 }

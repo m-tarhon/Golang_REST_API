@@ -1,12 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
-	"os"
 	"rest_api/types"
 	"rest_api/validators"
 	"slices"
@@ -16,7 +14,8 @@ import (
 var Users = []types.User{}
 var Apps = []types.App{}
 var (
-	Portflag = flag.String("port", "8080", "specifies which port to use to connect the server to")
+	HTTPflag = flag.String("http", "8080", "specifies which port to use to connect the server to")
+	HTTPSflag = flag.String("https", "8081", "specifies which port to use to connect the server to")
 )
 
 func healthcheck(w http.ResponseWriter, r *http.Request) {
@@ -225,55 +224,37 @@ func appsManagement(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	var port string
+	var port, ports string
 	flag.Parse()
 
-	if !validators.IsFlag("port") {
-		fmt.Println("Hello Server, what port would you like to connect to?")
-
-		for {
-			//an improvement could be switching to scanner but its minimal
-			reader := bufio.NewReader(os.Stdin)
-			port1, err0 := reader.ReadString('\n')
-			if err0 != nil {
-				fmt.Print("STOPPED.")
-				return
-			}
-
-			port1 = strings.TrimSpace(port1)
-			if port1 == "" {
-				fmt.Println("Port cannot be empty, please try again.")
-				continue
-			}
-
-			if !validators.IsValid(port1) {
-				fmt.Println("Invalid format. Pick a port from 1-65336.")
-				continue
-			}
-
-			if !validators.IsAvailable(port1) {
-				fmt.Println("This port is busy. Try something else.")
-				continue
-			}
-			port = port1
-			break
-		}
+	if !validators.IsFlag("http") {
+		validators.SMTH("http", &port)
 	} else {
-		port = *Portflag
+		port = *HTTPflag
 	}
+	if !validators.IsFlag("https") {
+		validators.SMTH("https", &ports)
+	} else {
+		ports = *HTTPSflag
+	}
+
 	port = ":" + port
-	
+	ports = ":" + ports
+
 	mux := SetupRoutes()
 
-	fmt.Printf("Starting server on port %s ...\n", port)
-	// err := http.ListenAndServe(port, mux)
-	// if err != nil {
-	// 	fmt.Print("Somethig unexpected happened: ")
-	// 	fmt.Println(err)
-	// 	fmt.Println("Maybe try again.")
-	//}
+	fmt.Printf("Starting HTTP server on port %s ...\n", port)
+	go func(){
+		err := http.ListenAndServe(port, mux)
+		if err != nil {
+			fmt.Print("Something unexpected happened: ")
+			fmt.Println(err)
+			fmt.Println("Maybe try again.")
+		}
+	}()
 
-	errs := http.ListenAndServeTLS(port, "cert.pem", "key.pem", mux)
+	fmt.Printf("Starting HTTPS server on port %s ...\n", ports)
+	errs := http.ListenAndServeTLS(ports, "cert.pem", "key.pem", mux)
 	if errs != nil{
 		fmt.Print("Somethig unexpected happened: ")
 		fmt.Println(errs)

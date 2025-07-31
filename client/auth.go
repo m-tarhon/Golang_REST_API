@@ -3,13 +3,12 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
-	"io"
 	"net/http"
 )
 
-func AuthReq(username, password, port string) error {
+func AuthReq(username, password string) error {
 	client := GetAuthClient(username, password)
-	req, err := http.NewRequest("GET", fmt.Sprintf("https://localhost:%s/users", port), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s://localhost:%s/users", Schema, Port), nil)
 
 	if err != nil {
 		return err
@@ -32,17 +31,4 @@ func AuthReq(username, password, port string) error {
 	}
 	// If auth succeeds, return nil
 	return nil
-}
-
-func Helper4Auth(method, url, username, password string, body io.Reader) (*http.Response, error) {
-    req, err := http.NewRequest(method, url, body)
-        if err != nil{
-            return nil, err 
-        }
-
-        if method==http.MethodPost || method == http.MethodDelete{
-            req.Header.Set("Content-Type", "application/json")
-        }
-
-		return SharedClient.Do(req)
 }

@@ -15,13 +15,19 @@ import (
 )
 
 var (
-	Portflag = flag.String("port", "8080", "specifies which port to use to connect the server to")
+	HTTPflag  = flag.Bool("http", false, "specifies whether to use HTTP")
+	HTTPSflag = flag.Bool("https", false, "specifies whether to use HTTPS")
+	Portflag  = flag.String("port", "8080", "specifies which port to use")
 )
 
-var SharedClient *http.Client
+var (
+	Port         string
+	Schema       string
+	SharedClient *http.Client
+)
 
-func userSide(port string, client *http.Client) {
-	base_url := "https://localhost:" + port + "/users"
+func userSide(client *http.Client) {
+	base_url := Schema + "://localhost:" + Port + "/users"
 	fmt.Println("User Client, type help for options or exit to quit")
 	scanner := bufio.NewScanner(os.Stdin)
 
@@ -52,7 +58,7 @@ func userSide(port string, client *http.Client) {
 		case "switch":
 			fmt.Println("Going to the app endpoint, bye!")
 			appClient := GetAuthClient("", "")
-			appSide(port, appClient)
+			appSide(appClient)
 
 			fmt.Println("\nBack to the user endpoint, type help for options or exit to quit")
 			continue
@@ -119,7 +125,7 @@ func userSide(port string, client *http.Client) {
 			}
 
 			name := args[1]
-			
+
 			req, err := http.NewRequest(http.MethodGet, base_url+"/"+name, nil)
 			if err != nil {
 				fmt.Println("Request creation failed:", err)
@@ -249,8 +255,8 @@ func userSide(port string, client *http.Client) {
 	}
 }
 
-func appSide(port string, client *http.Client) {
-	base_url := "https://localhost:" + port + "/apps"
+func appSide(client *http.Client) {
+	base_url := Schema + "://localhost:" + Port + "/apps"
 
 	fmt.Println("App Client, type help for options or exit to quit")
 	scanner := bufio.NewScanner(os.Stdin)
@@ -489,30 +495,52 @@ func appSide(port string, client *http.Client) {
 }
 
 // focus on making this less monolithic, bcs its horrible
-// try adding besides http a way to get into https
 func main() {
-	var port, endpoint string
+	var endpoint string
 	flag.Parse()
-	if !validators.IsFlag("port") {
 
-		fmt.Println("Hello Client, which port do you want?")
+	// maybe tell the client it can only pick http or https if they input both flags?
+	switch {
+	case validators.IsFlag("http"):
+		Schema = "http"
+	case validators.IsFlag("https"):
+		Schema = "https"
+	default:
+		fmt.Println("Hello Client, do you want http or https?")
+		for {
+			scanner := bufio.NewScanner(os.Stdin)
+			if !scanner.Scan() {
+				fmt.Print("STOPPED")
+				continue
+			}
+			Schema = strings.TrimSpace(scanner.Text())
+			if Schema != "http" && Schema != "https" {
+				fmt.Println("Invalid connection type, please try again.")
+				continue
+			}
+			break
+		}
+	}
+
+	if !validators.IsFlag("port") {
+		fmt.Println("Hello, which port do you want?")
 		for {
 			scanner := bufio.NewScanner(os.Stdin)
 			if !scanner.Scan() {
 				fmt.Print("STOPPED")
 				return
 			}
-			port = scanner.Text()
+			Port = scanner.Text()
 			var port_int int
-			fmt.Sscanf(port, "%d", &port_int)
-			if !validators.IsValid(port) {
+			fmt.Sscanf(Port, "%d", &port_int)
+			if !validators.IsValid(Port) {
 				fmt.Println("Nonexistent port, format is xxxx. Try again.")
 				continue
 			}
 			break
 		}
 	} else {
-		port = *Portflag
+		Port = *Portflag
 	}
 
 	fmt.Println("Which endpoint do you want to vist: type 'users' or 'apps'")
@@ -542,7 +570,7 @@ func main() {
 			fmt.Println("please give your password: ")
 			fmt.Scanln(&password)
 
-			err := AuthReq(username, password, port)
+			err := AuthReq(username, password)
 			if err != nil {
 				fmt.Printf("Auth error: %v\n", err)
 				fmt.Println("try again")
@@ -551,8 +579,9 @@ func main() {
 			break
 		}
 		SharedClient = GetAuthClient(username, password)
-		userSide(port, SharedClient)
+		userSide(SharedClient)
 	} else {
 		SharedClient = GetAuthClient("", "")
-		appSide(port, SharedClient)	}
+		appSide(SharedClient)
+	}
 }

@@ -17,6 +17,7 @@ func SetupRoutes() *http.ServeMux {
 
 		// uses default registry, but i have a custom one
 		mux.Handle("/metrics", promhttp.HandlerFor(metrics.Registry, promhttp.HandlerOpts{}))
-
+		mux.Handle("/system", promhttp.HandlerFor(metrics.SystemRegistry, promhttp.HandlerOpts{}))
+			// for system metrics, cpu, mem, etc
 		return mux
 }

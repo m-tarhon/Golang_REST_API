@@ -27,6 +27,7 @@ func MetricsMiddleware(next http.Handler) http.Handler {
 		duration := time.Since(start).Seconds()
 
 		metrics.ReqCounter.WithLabelValues(r.Method, http.StatusText(rw.statusCode), r.URL.Path).Inc()
+		//metrics.ReqDuration.WithLabelValues(r.Method, r.URL.Path).Observe(duration)
 		log.Printf("Request: %s %s took %v", r.Method, r.URL.Path, duration)
 	})
 }

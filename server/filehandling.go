@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"rest_api/metrics"
 	"rest_api/types"
 )
 
@@ -15,120 +16,136 @@ const path1 = "./db/apps.jsonl"
 // try getting logs and see if you can measure latency and memory usage betweeen the 2 implementations
 
 func LoadUsers() {
-	fileBytes, err := os.ReadFile(path)
-	if err != nil {
-		// if the file doesnt exist create it cuz i dont think im doing that here
-		if os.IsNotExist(err) {
-			log.Println("users.json not found, starting with an empty user list.")
-			Users = []types.User{}
-			return
+	err := metrics.MeasureFileOperation("load", "users", func() error {
+		fileBytes, err := os.ReadFile(path)
+		if err != nil {
+			// if the file doesnt exist create it cuz i dont think im doing that here
+			if os.IsNotExist(err) {
+				log.Println("users.json not found, starting with an empty user list.")
+				Users = []types.User{}
+				return nil // Not an error case
+			}
+			return err
 		}
-		log.Fatalf("Failed to read users.json: %v", err)
-	}
 
-	err = json.Unmarshal(fileBytes, &Users)
+		return json.Unmarshal(fileBytes, &Users)
+	})
+
 	if err != nil {
-		log.Fatalf("Failed to parse users.json: %v", err)
+		log.Fatalf("Failed to load users: %v", err)
 	}
 }
 
 func SaveUsers() {
-	// Ensure directory exists
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-		log.Printf("Failed to create db directory: %v", err)
-		return
-	}
+	err := metrics.MeasureFileOperation("save", "users", func() error {
+		// Ensure directory exists
+		dir := filepath.Dir(path)
+		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+			return err
+		}
 
-	fileBytes, err := json.MarshalIndent(Users, "", "  ")
-	if err != nil {
-		log.Printf("Failed to marshal users: %v", err)
-		return
-	}
+		fileBytes, err := json.MarshalIndent(Users, "", "  ")
+		if err != nil {
+			return err
+		}
 
-	err = os.WriteFile(path, fileBytes, 0644)
+		return os.WriteFile(path, fileBytes, 0644)
+	})
+
 	if err != nil {
-		log.Printf("Failed to write users.json: %v", err)
+		log.Printf("Failed to save users: %v", err)
 	}
 }
 
 func LoadApps(name string) ([]types.App, error) {
-	file, err := os.Open(path1)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []types.App{}, nil
-		}
-		return nil, err
-	}
-	defer file.Close()
-
 	var matches []types.App
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		var app types.App
-		if err := json.Unmarshal(scanner.Bytes(), &app); err != nil {
-			continue
+
+	err := metrics.MeasureFileOperation("load", "apps", func() error {
+		file, err := os.Open(path1)
+		if err != nil {
+			if os.IsNotExist(err) {
+				matches = []types.App{}
+				return nil
+			}
+			return err
 		}
-		if name == "" || app.Name == name {
-			matches = append(matches, app)
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			var app types.App
+			if err := json.Unmarshal(scanner.Bytes(), &app); err != nil {
+				continue
+			}
+			if name == "" || app.Name == name {
+				matches = append(matches, app)
+			}
 		}
-	}
-	return matches, scanner.Err()
+		return scanner.Err()
+	})
+
+	return matches, err
 }
 
 func AppendApp(app types.App) error {
-	file, err := os.OpenFile(path1, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
+	return metrics.MeasureFileOperation("append", "apps", func() error {
+		file, err := os.OpenFile(path1, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
 
-	encoder := json.NewEncoder(file)
-	return encoder.Encode(app)
+		encoder := json.NewEncoder(file)
+		return encoder.Encode(app)
+	})
 }
 
 func DeleteApp(target types.App) (bool, error) {
-	input, err := os.Open(path1)
-	if err != nil {
-		return false, err
-	}
-	defer input.Close()
+	var found bool
 
-	tempPath := path1 + ".tmp"
-	output, err := os.Create(tempPath)
-	if err != nil {
-		return false, err
-	}
-	defer output.Close()
+	err := metrics.MeasureFileOperation("delete", "apps", func() error {
+		input, err := os.Open(path1)
+		if err != nil {
+			return err
+		}
+		defer input.Close()
 
-	scanner := bufio.NewScanner(input)
-	writer := bufio.NewWriter(output)
-	found := false
+		tempPath := path1 + ".tmp"
+		output, err := os.Create(tempPath)
+		if err != nil {
+			return err
+		}
+		defer output.Close()
 
-	for scanner.Scan() {
-		var app types.App
-		if err := json.Unmarshal(scanner.Bytes(), &app); err != nil {
-			continue
+		scanner := bufio.NewScanner(input)
+		writer := bufio.NewWriter(output)
+
+		for scanner.Scan() {
+			var app types.App
+			if err := json.Unmarshal(scanner.Bytes(), &app); err != nil {
+				continue
+			}
+
+			if app.Name == target.Name && app.Born == target.Born && app.Price == target.Price {
+				found = true
+				continue // skip writing this one
+			}
+
+			writer.Write(scanner.Bytes())
+			writer.Write([]byte("\n"))
+		}
+		writer.Flush()
+		input.Close()
+		output.Close()
+
+		if found {
+			os.Rename(tempPath, path1)
+		} else {
+			os.Remove(tempPath)
 		}
 
-		if app.Name == target.Name && app.Born == target.Born && app.Price == target.Price {
-			found = true
-			continue // skip writing this one
-		}
+		return nil
+	})
 
-		writer.Write(scanner.Bytes())
-		writer.Write([]byte("\n"))
-	}
-	writer.Flush()
-	input.Close()
-	output.Close()
-
-	if found {
-		os.Rename(tempPath, path1)
-	} else {
-		os.Remove(tempPath)
-	}
-
-	return found, scanner.Err()
-
+	return found, err
 }

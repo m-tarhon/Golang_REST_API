@@ -7,9 +7,12 @@ import (
 	"net/http"
 	"rest_api/types"
 	"rest_api/validators"
+	"rest_api/metrics"
 	"slices"
 	"strings"
 )
+
+// and maybe tmrw, utilization metrics
 
 var Users = []types.User{}
 var Apps = []types.App{}
@@ -224,6 +227,8 @@ func appsManagement(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	metrics.Init()
+
 	var port, ports string
 	flag.Parse()
 

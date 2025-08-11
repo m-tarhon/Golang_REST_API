@@ -13,8 +13,6 @@ import (
 const path = "./db/users.json"
 const path1 = "./db/apps.jsonl"
 
-// try getting logs and see if you can measure latency and memory usage betweeen the 2 implementations
-
 func LoadUsers() {
 	err := metrics.MeasureFileOperation("load", "users", func() error {
 		fileBytes, err := os.ReadFile(path)
@@ -37,7 +35,11 @@ func LoadUsers() {
 }
 
 func SaveUsers() {
+	log.Printf("SaveUsers() called - about to measure file operation")
+
 	err := metrics.MeasureFileOperation("save", "users", func() error {
+		log.Printf("Inside SaveUsers() file operation function")
+
 		// Ensure directory exists
 		dir := filepath.Dir(path)
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
@@ -54,6 +56,8 @@ func SaveUsers() {
 
 	if err != nil {
 		log.Printf("Failed to save users: %v", err)
+	} else {
+		log.Printf("SaveUsers() completed successfully")
 	}
 }
 

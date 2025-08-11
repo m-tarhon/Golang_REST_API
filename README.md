@@ -5,7 +5,11 @@ A REST api writte in Golang, capable of
 - requires authentication for the users endpoint 
 - allows you to choose which port to start your server on, throough the use of flags or through CLI 
 - has a basic persistant storage configured 
-
+- exposes a prometheus endpoint 
+- contanins prometheus and grafana containers that managa visualisation of metrics.
+    - to run them: docker-compose up
+- contains a script that continuously runs request
+    - to run ./background_requests
 ## To run, do:
 Open two terminals
 - first run: go run ./server
@@ -20,13 +24,6 @@ Open two terminals
 ## Testing out the prometheus endpoint
 Useful commands
 - curl http://localhost:8080/metrics | grep http_requests_total
-- curl -X POST -u boss:man http://localhost:8080/users -H "Content-Type: application/json" -d '{"name":"alyce","age":25}'
-- curl -u boss:man http://localhost:8080/users/alyce
-- curl -X DELETE -u boss:man http://localhost:8080/users -H "Content-Type: application/json" -d '{"name":"alyce","age":25}'
-- curl -u boss:man http://localhost:8080/apps
-- curl -u boss:man http://localhost:8080/apps/Quran
-- curl -X POST -u boss:man http://localhost:8080/users -H "Content-Type: application/json" -d '{"name":"bible", "born":1666,"price":76.2 }'
-- curl -X POST -u boss:man http://localhost:8080/apps -H "Content-Type: application/json" -d '{"name":"Hazel", "born":1666,"price":76.2 }'
 - curl http://localhost:8080/metrics | grep http_requests_total | sort
 - curl http://localhost:8080/metrics | grep 'http_requests_total.*apps'
 - curl http://localhost:8080/metrics | grep 'http_requests_total.*users'

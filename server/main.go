@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"  // Add this import
 	"net/http"
 	"rest_api/types"
 	"rest_api/validators"
@@ -11,8 +12,6 @@ import (
 	"slices"
 	"strings"
 )
-
-// and maybe tmrw, utilization metrics
 
 var Users = []types.User{}
 var Apps = []types.App{}
@@ -32,8 +31,8 @@ func healthcheck(w http.ResponseWriter, r *http.Request) {
 func userManagement(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/users")
 	path = strings.Trim(path, "/")
-
 	segments := strings.Split(path, "/")
+
 	LoadUsers()
 
 	switch r.Method {
@@ -109,9 +108,14 @@ func userManagement(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for i, person := range Users {
-			if person.Name == p.Name && p.Age == person.Age {
+			if person.Name == p.Name && person.Age == p.Age {
 				Users = slices.Delete(Users, i, i+1)
+				
+				// Add debug logging
+				log.Printf("About to call SaveUsers() for deletion of %s", p.Name)
 				SaveUsers()
+				log.Printf("SaveUsers() completed for deletion")
+				
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte(`{"message": "Server-side User deleted succesfully!"}`))

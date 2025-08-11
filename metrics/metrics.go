@@ -7,9 +7,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-
 // ill need a prometheus server running
-// and then a grafaa server to visualize the metrics, running in front o fit 
+// and then a grafaa server to visualize the metrics, running in front o fit
 var (
 	Registry       = prometheus.NewRegistry()
 	SystemRegistry = prometheus.NewRegistry()
@@ -19,10 +18,10 @@ var (
 		Help: "Total number of HTTP requests",
 	}, []string{"method", "status", "endpoint"})
 
-	// CpuUsage = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-	// 	Name: "cpu_usage",
-	// 	Help: "Current CPU usage",
-	// }, []string{"cpu"})
+	CpuUsage = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "cpu_usage",
+		Help: "Current CPU usage",
+	}, []string{"cpu"})
 
 	MemoryUsage = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "memory_usage",
@@ -52,9 +51,8 @@ func Init() {
 	Registry.MustRegister(FileOpCounter)
 	Registry.MustRegister(FileOpDuration)
 	// Registry.MustRegister(ReqDuration)
-	// SystemRegistry.MustRegister(CpuUsage) // to add cpu usage i need an external package
+	Registry.MustRegister(CpuUsage) // to add cpu usage i need an external package
 	SystemRegistry.MustRegister(MemoryUsage)
-
 	go collectSystemMetrics()
 }
 
@@ -67,10 +65,13 @@ func collectSystemMetrics() {
 	for range ticker.C {
 		var m runtime.MemStats
 		runtime.ReadMemStats(&m)
+		cpu := runtime.NumCPU()
+
 		MemoryUsage.WithLabelValues("alloc").Set(float64(m.Alloc))
 		MemoryUsage.WithLabelValues("sys").Set(float64(m.Sys))
 		MemoryUsage.WithLabelValues("heap_alloc").Set(float64(m.HeapAlloc))
 		MemoryUsage.WithLabelValues("heap_sys").Set(float64(m.HeapSys))
+		CpuUsage.WithLabelValues("usage").Set(float64(cpu))
 	}
 }
 
